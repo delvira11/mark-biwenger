@@ -28,13 +28,13 @@ text = response.text
 json_text = re.sub(r'^jsonp_\d+\((.*)\)$', r'\1', text)
 data = json.loads(json_text)
 
-i= 0
-for key in data['data']['players']:
-     i += 1
-     print(i)
-     print(data['data']['players'][key])
-#     break
+# i= 0
+# for key in data['data']['players']:
+#      i += 1
+#      print(i)
+#      print(data['data']['players'][key])
+# #     break
 
 
-#print(data['data']['players']['33474'])
+print(data['data']['players']['33474'])
 
