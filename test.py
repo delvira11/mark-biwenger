@@ -36,5 +36,4 @@ data = json.loads(json_text)
 # #     break
 
 
-print(data['data']['players']['33474'])
 
