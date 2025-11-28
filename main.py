@@ -1,6 +1,7 @@
 import requests
 import json
 import datetime
+import psycopg
 
 email = "sleepwalking1113@gmail.com"
 password = "Yoquesetio1"
@@ -232,8 +233,29 @@ if __name__ == "__main__":
     # engine.get_global_player_info()
     # engine.get_my_players_league()
     # engine.get_others_team_info()
-    engine.get_transfer_info()
+    # engine.get_transfer_info()
 
+    conn = psycopg.connect(
+        dbname = "mark_database",
+        user="postgres",
+        password = "Yoquesetio1",
+        host = "localhost",
+        port=5432
+    )
 
+    cursor = conn.cursor()
+
+    print("Connected")
+
+    # Create Tables
+
+    cursor.execute(
+        """
+        CREATE TABLE test (
+            id SERIAL PRIMARY KEY,
+            name VARCHAR(100)
+        );
+        """)
+    conn.commit()
 
     
