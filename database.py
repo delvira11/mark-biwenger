@@ -1,5 +1,5 @@
 import psycopg
-
+#https://sqlbolt.com/
 
 DB_NAME = "mark_database"
 
