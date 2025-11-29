@@ -2,6 +2,7 @@ import requests
 import json
 import datetime
 import psycopg
+from psycopg.rows import dict_row
 
 email = "sleepwalking1113@gmail.com"
 password = "Yoquesetio1"
@@ -223,10 +224,147 @@ class RequestEngine():
         return transfers
 
 
+class HandleDatabase():
+    def __init__(self, host="localhost", port=5432, user="postgres", password="", dbname=None):
+        self.host = host
+        self.port = port
+        self.user = user
+        self.password = password
+        self.dbname = dbname
+        self.conn = None
+    
+    def create_database(self, database_name):
+        try:
+            with psycopg.connect(
+                dbname="postgres",
+                user=self.user,
+                password=self.password,
+                host=self.host,
+                port=self.port,
+            ) as conn:
+                conn.autocommit = True
+
+                with conn.cursor() as cur:
+                    cur.execute(f"SELECT 1 FROM pg_database WHERE datname = '{database_name}';")
+                    exists = cur.fetchone()
+
+                    if exists:
+                        print(f"Database '{database_name}' already exists.")
+                    else:
+                        cur.execute(f"CREATE DATABASE {database_name};")
+                        print(f"Database '{database_name}' created successfully.")
+
+        except Exception as e:
+            print("Error creating database:", e)
+
+    def connect(self):
+        """Establece conexión a la base de datos objetivo."""
+        try:
+            self.conn = psycopg.connect(
+                dbname=self.dbname,
+                user=self.user,
+                password=self.password,
+                host=self.host,
+                port=self.port,
+                row_factory=dict_row  # devolver diccionarios
+            )
+            print(f"Connected to database '{self.dbname}'.")
+        except Exception as e:
+            print("Error connecting:", e)
+
+    def close(self):
+        """Cierra la conexión."""
+        if self.conn:
+            self.conn.close()
+            self.conn = None
+            print("Connection closed.")
+
+    def create_tables(self):
+        queries = [
+            """
+            CREATE TABLE IF NOT EXISTS players (
+                player_id SERIAL PRIMARY KEY,
+                name VARCHAR(100) NOT NULL,
+                team VARCHAR(100),
+                position VARCHAR(20)
+            );
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS player_prices (
+                player_id INT REFERENCES players(player_id),
+                date DATE NOT NULL,
+                price NUMERIC NOT NULL,
+                PRIMARY KEY (player_id, date)
+            );
+            """,
+            # Este índice se crea para optimizar las consultas del precio de todos los jugadores para un día concreto
+            """
+            CREATE INDEX IF NOT EXISTS idx_player_prices_date
+            ON player_prices (date);
+            """
+        ]
+
+        try:
+            with self.conn.cursor() as cur:
+                for q in queries:
+                    cur.execute(q)
+            self.conn.commit()
+            print("Tables created successfully.")
+        except Exception as e:
+            print("Error creating tables:", e)
+            self.conn.rollback()
+
+    def execute_query(self, query, params=None, fetch=False):
+        """Ejecuta una query SQL genérica."""
+        try:
+            with self.conn.cursor() as cur:
+                cur.execute(query, params or ())
+                if fetch:
+                    return cur.fetchall()
+                self.conn.commit()
+        except Exception as e:
+            print("❌ Query error:", e)
+            self.conn.rollback()
+
+
+    def insert_many(self, query, rows):
+        """Inserta múltiples filas (bulk insert)."""
+        try:
+            with self.conn.cursor() as cur:
+                cur.executemany(query, rows)
+            self.conn.commit()
+        except Exception as e:
+            print("❌ Bulk insert error:", e)
+            self.conn.rollback()
+
+    def insert_one(self, query, params):
+        """Inserta una sola fila."""
+        self.execute_query(query, params)
+
+
+
+def insert_player_info(request_engine, database_engine):
+    player_info = request_engine.get_global_player_info()
+    query = """
+        INSERT INTO players (player_id, name, team, position)
+        VALUES (%s, %s, %s, %s)
+        ON CONFLICT (player_id) DO UPDATE
+        SET name = EXCLUDED.name,
+            team = EXCLUDED.team,
+            position = EXCLUDED.position;
+    """
+
+    rows = [
+        ]
+    
+    for player in player_info:
+        data = (player['id'], player['name'], player['position'], player['teamID'])
+        rows.append(data)
+    database_engine.insert_many(query, rows)        
 
 
 if __name__ == "__main__":
-    engine = RequestEngine()
+    request_engine = RequestEngine()
     # engine.get_login(email, password)
     # engine.get_account_info()
     # engine.get_leagues_info()
@@ -235,27 +373,12 @@ if __name__ == "__main__":
     # engine.get_others_team_info()
     # engine.get_transfer_info()
 
-    conn = psycopg.connect(
-        dbname = "mark_database",
-        user="postgres",
-        password = "Yoquesetio1",
-        host = "localhost",
-        port=5432
-    )
+    database_engine = HandleDatabase(password="Yoquesetio1", dbname='mark_database')
+    # database_engine.create_database('mark_database')
+    database_engine.connect()
+    # database_engine.create_tables()
+    # database_engine.close()
 
-    cursor = conn.cursor()
-
-    print("Connected")
-
-    # Create Tables
-
-    cursor.execute(
-        """
-        CREATE TABLE test (
-            id SERIAL PRIMARY KEY,
-            name VARCHAR(100)
-        );
-        """)
-    conn.commit()
+    insert_player_info(request_engine, database_engine)
 
     
